@@ -13,12 +13,20 @@ defmodule Memory.Database do
     GenServer.call(pid, :board)
   end
 
+  def players(pid \\ __MODULE__) do
+    GenServer.call(pid, :players)
+  end
+
+  def join_game_room(pid \\ __MODULE__, player_id) do
+    GenServer.call(pid, {:join_game_room, player_id})
+  end
+
   def reset(pid \\ __MODULE__) do
     GenServer.call(pid, :reset)
   end
 
   def init(_opts) do
-    {:ok, %{board: generate_game_board(), player_one_id: nil, player_two_id: nil}}
+    {:ok, %{board: generate_game_board(), players: players_map()}}
   end
 
   def handle_call({:open, emoji_id}, _from, %{board: board} = state) do
@@ -38,6 +46,24 @@ defmodule Memory.Database do
     {:reply, state.board, state}
   end
 
+  def handle_call(:players, _from, state) do
+    {:reply, state.players, state}
+  end
+
+  def handle_call(
+        {:join_game_room, player_id},
+        _from,
+        %{players: %{player_one: %{id: nil}}} = state
+      ) do
+    new_state = put_in(state, [:players, :player_one, :id], player_id)
+    {:reply, new_state, new_state}
+  end
+
+  def handle_call({:join_game_room, player_id}, _from, state) do
+    new_state = put_in(state, [:players, :player_two, :id], player_id)
+    {:reply, new_state, new_state}
+  end
+
   def handle_call(:reset, _from, state) do
     new_state = %{state | board: generate_game_board()}
     {:reply, new_state, new_state}
@@ -55,7 +81,7 @@ defmodule Memory.Database do
 
       [{id1, {_, _}}, {id2, {_, _}}] ->
         board
-        |> Map.update!(id1, fn {_status, emoji} -> {:hidden, emoji} end)
+        |> Map.updfate!(id1, fn {_status, emoji} -> {:hidden, emoji} end)
         |> Map.update!(id2, fn {_status, emoji} -> {:hidden, emoji} end)
     end
   end
@@ -69,5 +95,12 @@ defmodule Memory.Database do
     |> Enum.map(fn {em, i} -> {i, {:hidden, em}} end)
     |> Enum.shuffle()
     |> Map.new()
+  end
+
+  defp players_map do
+    %{
+      player_one: %{id: nil, score: 0},
+      player_two: %{id: nil, score: 0}
+    }
   end
 end

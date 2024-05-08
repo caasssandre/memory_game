@@ -4,8 +4,14 @@ defmodule MemoryWeb.MemoryLive do
   alias Memory.Database
 
   def mount(_params, _session, socket) do
-    socket = assign(socket, board: Database.board())
-    # Database.join_game(socket.id)
+    socket = assign(socket, board: Database.board(), players: Database.players())
+
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Memory.PubSub, "memory")
+    else
+      Database.join_game_room(socket.id)
+    end
+
     {:ok, socket}
   end
 
@@ -14,6 +20,11 @@ defmodule MemoryWeb.MemoryLive do
     <div class="bg-gray-100">
       <div class="container mx-auto p-4">
         <h1 class="text-2xl font-bold">Memory</h1>
+
+        <ul :for={{player, %{id: _, score: score}} <- @players} style="list-style: disc;" class="ml-4">
+          <li>Score: <%= player %>: <%= score %></li>
+        </ul>
+
         <p class="text-gray-600">A simple memory game</p>
 
         <ul :for={{i, {status, emoji}} <- @board} style="list-style: disc;" class="ml-4">
