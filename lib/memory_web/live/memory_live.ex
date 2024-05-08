@@ -44,12 +44,12 @@ defmodule MemoryWeb.MemoryLive do
   end
 
   def handle_event("open_emoji", %{"id" => emoji_id}, socket) do
-    Database.open(emoji_id)
-    {:noreply, assign(socket, board: Database.board())}
+    Database.open(emoji_id, socket.id)
+    {:noreply, assign(socket, board: Database.board(), players: Database.players())}
   end
 
   def handle_event("reset_game", _params, socket) do
     Database.reset()
-    {:noreply, assign(socket, board: Database.board())}
+    {:noreply, assign(socket, board: Database.board(), players: Database.players())}
   end
 end
