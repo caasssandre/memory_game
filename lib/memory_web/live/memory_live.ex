@@ -4,13 +4,14 @@ defmodule MemoryWeb.MemoryLive do
   alias Memory.Database
 
   def mount(_params, _session, socket) do
-    socket = assign(socket, board: Database.board(), players: Database.players())
-
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Memory.PubSub, "memory")
     else
       Database.join_game_room(socket.id)
+      Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :board_updated)
     end
+
+    socket = assign(socket, board: Database.board(), players: Database.players())
 
     {:ok, socket}
   end
@@ -20,17 +21,27 @@ defmodule MemoryWeb.MemoryLive do
     <div class="bg-gray-100">
       <div class="container mx-auto p-4">
         <h1 class="text-2xl font-bold">Memory</h1>
-
-        <ul :for={{player, %{id: _, score: score}} <- @players} style="list-style: disc;" class="ml-4">
-          <li>Score: <%= player %>: <%= score %></li>
+        <ul :for={%{id: _, score: score} <- @players} style="list-style: disc;" class="ml-4">
+          <li>Score: <%= score %></li>
         </ul>
 
         <p class="text-gray-600">A simple memory game</p>
 
-        <ul :for={{i, {status, emoji}} <- @board} style="list-style: disc;" class="ml-4">
-          <li :if={status == :hidden} phx-click="open_emoji" phx-value-id={i}>X</li>
-          <li :if={status == :open || status == :guessed}><%= emoji %></li>
-        </ul>
+        <div class="text-2xl ml-4 flex flex-wrap">
+          <p :for={{i, {status, emoji}} <- @board} class="m-3">
+            <span
+              :if={status == :hidden}
+              phx-click="open_emoji"
+              phx-value-id={i}
+              class="cursor-pointer"
+            >
+              X
+            </span>
+            <span :if={status == :open || status == :guessed} class="cursor-default">
+              <%= emoji %>
+            </span>
+          </p>
+        </div>
       </div>
 
       <button
@@ -53,13 +64,13 @@ defmodule MemoryWeb.MemoryLive do
 
   def handle_event("reset_game", _params, socket) do
     Database.reset()
+    Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :board_updated)
     {:noreply, assign(socket, board: Database.board(), players: Database.players())}
   end
 
   def handle_info(:check_open_emojis, socket) do
     Database.check_open_emojis(socket.id)
     Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :board_updated)
-
     {:noreply, socket |> assign(board: Database.board(), players: Database.players())}
   end
 

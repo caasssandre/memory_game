@@ -30,7 +30,7 @@ defmodule Memory.Database do
   end
 
   def init(_opts) do
-    {:ok, %{board: generate_game_board(), players: players_map()}}
+    {:ok, %{board: generate_game_board(), players: []}}
   end
 
   def handle_call({:open, emoji_id}, _from, %{board: board} = state) do
@@ -54,24 +54,28 @@ defmodule Memory.Database do
     {:reply, state.players, state}
   end
 
-  def handle_call(
-        {:join_game_room, socket_id},
-        _from,
-        %{players: %{player_one: %{id: nil}}} = state
-      ) do
-    new_state = put_in(state, [:players, :player_one, :id], socket_id)
+  def handle_call({:join_game_room, socket_id}, _from, %{players: []} = state) do
+    new_players = %{id: socket_id, score: 0}
+    new_state = %{state | players: [new_players]}
+
     {:reply, new_state, new_state}
   end
 
-  def handle_call({:join_game_room, socket_id}, _from, state) do
-    new_state = put_in(state, [:players, :player_two, :id], socket_id)
+  def handle_call({:join_game_room, socket_id}, _from, %{players: [player_one | []]} = state) do
+    new_players = [%{id: socket_id, score: 0}, player_one]
+    new_state = %{state | players: new_players}
+
     {:reply, new_state, new_state}
+  end
+
+  def handle_call({:join_game_room, _socket_id}, _from, state) do
+    {:reply, state, state}
   end
 
   def handle_call(:reset, _from, state) do
     new_state =
       state
-      |> Map.update!(:players, fn _ -> players_map() end)
+      |> Map.update!(:players, fn _ -> reset_players(state) end)
       |> Map.update!(:board, fn _ -> generate_game_board() end)
 
     {:reply, new_state, new_state}
@@ -116,27 +120,29 @@ defmodule Memory.Database do
   end
 
   defp generate_game_board do
-    # emojis = ["😀", "😂", "😅", "😍", "😎", "😏", "😡", "🥳", "😭", "🤔", "🤩", "🤷"]
-    emojis = ["😀", "😂", "🤷"]
+    emojis = ["😀", "😂", "😅", "😍", "😎", "😏", "😡", "🥳", "😭", "🤔", "🤩", "🤷"]
+    # emojis = ["😀", "😂", "🤷"]
 
     (emojis ++ emojis)
     |> Enum.with_index()
     |> Enum.map(fn {em, i} -> {i, {:hidden, em}} end)
-    |> Enum.shuffle()
     |> Map.new()
   end
 
-  defp players_map do
-    %{
-      player_one: %{id: nil, score: 0},
-      player_two: %{id: nil, score: 0}
-    }
+  defp reset_players(%{players: players}) do
+    Enum.map(players, fn player -> %{id: player.id, score: 0} end)
   end
 
   defp inc_point(players, socket_id) do
-    [{identifier, _player}] =
-      Enum.filter(players, fn {_, %{id: id, score: _}} -> id == socket_id end)
+    Enum.find_index(players, fn %{id: id, score: _} -> id == socket_id end)
+    |> case do
+      nil ->
+        players
 
-    Map.update!(players, identifier, fn %{id: id, score: score} -> %{id: id, score: score + 1} end)
+      index ->
+        List.update_at(players, index, fn %{id: id, score: score} ->
+          %{id: id, score: score + 1}
+        end)
+    end
   end
 end
