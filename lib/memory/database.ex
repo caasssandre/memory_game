@@ -21,8 +21,8 @@ defmodule Memory.Database do
     GenServer.call(pid, :current_player)
   end
 
-  def check_open_emojis(pid \\ __MODULE__, player_id) do
-    GenServer.call(pid, {:check_open_emojis, player_id})
+  def check_open_emojis(pid \\ __MODULE__) do
+    GenServer.call(pid, :check_open_emojis)
   end
 
   def join_game_room(pid \\ __MODULE__) do
@@ -93,7 +93,7 @@ defmodule Memory.Database do
   end
 
   def handle_call(
-        {:check_open_emojis, player_id},
+        :check_open_emojis,
         _from,
         %{board: board, players: players, current_player: current_player} = state
       ) do
@@ -107,7 +107,7 @@ defmodule Memory.Database do
             |> List.update_at(id1, fn {id, {_status, emoji}} -> {id, {:guessed, emoji}} end)
             |> List.update_at(id2, fn {id, {_status, emoji}} -> {id, {:guessed, emoji}} end)
 
-          updated_players = inc_point(players, player_id)
+          updated_players = inc_point(players, current_player + 1)
           {updated_players, updated_board, current_player}
 
         [{id1, {_, _}}, {id2, {_, _}}] ->
