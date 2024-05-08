@@ -101,7 +101,7 @@ defmodule MemoryWeb.MemoryLive do
 
   def handle_event("reset_game", _params, socket) do
     Database.reset()
-    Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :board_updated)
+    Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_reset)
 
     {:noreply,
      assign(socket,
@@ -114,7 +114,7 @@ defmodule MemoryWeb.MemoryLive do
 
   def handle_event("join_game", _params, socket) do
     player_id = Database.join_game_room()
-    Phoenix.PubSub.broadcast(Memory.PubSub, "memory", {:player_joined})
+    Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :player_joined)
 
     {:noreply,
      assign(socket,
@@ -147,9 +147,20 @@ defmodule MemoryWeb.MemoryLive do
      )}
   end
 
-  def handle_info({:player_joined}, socket) do
+  def handle_info(:player_joined, socket) do
     {:noreply,
      socket
      |> assign(players: Database.players())}
+  end
+
+  def handle_info(:game_reset, socket) do
+    {:noreply,
+     socket
+     |> assign(
+       board: Database.board(),
+       players: Database.players(),
+       current_player: Database.current_player(),
+       player_id: nil
+     )}
   end
 end
