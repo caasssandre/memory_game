@@ -40,8 +40,6 @@ defmodule Memory.Database do
 
     new_state =
       if round_outcome == :good_pair do
-        dbg(players)
-        dbg(socket_id)
         new_players = inc_point(players, socket_id)
 
         state
