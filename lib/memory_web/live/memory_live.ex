@@ -8,7 +8,13 @@ defmodule MemoryWeb.MemoryLive do
       Phoenix.PubSub.subscribe(Memory.PubSub, "memory")
     end
 
-    socket = assign(socket, board: Database.board(), players: Database.players(), player_id: nil)
+    socket =
+      assign(socket,
+        board: Database.board(),
+        players: Database.players(),
+        player_id: nil,
+        current_player: Database.current_player()
+      )
 
     {:ok, socket}
   end
@@ -19,6 +25,8 @@ defmodule MemoryWeb.MemoryLive do
       <div class="container mx-auto p-4">
         <h1 class="text-2xl font-bold">Memory</h1>
         <p :if={@player_id != nil}>You are player <%= @player_id %></p>
+        <p :if={@current_player + 1 == @player_id} class="text-green-500">It's your turn</p>
+        <p :if={@current_player + 1 != @player_id} class="text-red-500">Waiting for other player</p>
         <ul :for={%{id: id, score: score} <- @players} style="list-style: disc;" class="ml-4">
           <li>Score for player <%= id %>: <%= score %></li>
         </ul>
@@ -28,13 +36,14 @@ defmodule MemoryWeb.MemoryLive do
         <div class="text-2xl ml-4 flex flex-wrap">
           <p :for={{i, {status, emoji}} <- @board} class="m-3">
             <span
-              :if={status == :hidden}
+              :if={status == :hidden && @current_player + 1 == @player_id}
               phx-click="open_emoji"
               phx-value-id={i}
               class="cursor-pointer"
             >
               X
             </span>
+            <span :if={status == :hidden && @current_player + 1 != @player_id}>X</span>
             <span :if={status == :open || status == :guessed} class="cursor-default">
               <%= emoji %>
             </span>
@@ -80,7 +89,8 @@ defmodule MemoryWeb.MemoryLive do
      assign(socket,
        board: Database.board(),
        players: Database.players(),
-       player_id: nil
+       player_id: nil,
+       current_player: Database.current_player()
      )}
   end
 
@@ -104,7 +114,8 @@ defmodule MemoryWeb.MemoryLive do
      socket
      |> assign(
        board: Database.board(),
-       players: Database.players()
+       players: Database.players(),
+       current_player: Database.current_player()
      )}
   end
 
@@ -113,7 +124,8 @@ defmodule MemoryWeb.MemoryLive do
      socket
      |> assign(
        board: Database.board(),
-       players: Database.players()
+       players: Database.players(),
+       current_player: Database.current_player()
      )}
   end
 
