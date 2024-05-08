@@ -5,8 +5,8 @@ defmodule Memory.Database do
     GenServer.start_link(__MODULE__, nil, name: __MODULE__)
   end
 
-  def open(pid \\ __MODULE__, emoji_id, socket_id) do
-    GenServer.call(pid, {:open, emoji_id, socket_id})
+  def open(pid \\ __MODULE__, emoji_id) do
+    GenServer.call(pid, {:open, emoji_id})
   end
 
   def board(pid \\ __MODULE__) do
@@ -15,6 +15,10 @@ defmodule Memory.Database do
 
   def players(pid \\ __MODULE__) do
     GenServer.call(pid, :players)
+  end
+
+  def check_open_emojis(pid \\ __MODULE__, socket_id) do
+    GenServer.call(pid, {:check_open_emojis, socket_id})
   end
 
   def join_game_room(pid \\ __MODULE__, socket_id) do
@@ -29,25 +33,15 @@ defmodule Memory.Database do
     {:ok, %{board: generate_game_board(), players: players_map()}}
   end
 
-  def handle_call({:open, emoji_id, socket_id}, _from, %{board: board, players: players} = state) do
-    {round_outcome, new_board} =
+  def handle_call({:open, emoji_id}, _from, %{board: board} = state) do
+    new_board =
       if board |> Enum.filter(fn {_id, {status, _}} -> status == :open end) |> length() < 2 do
-        {:no_pair,
-         Map.update!(board, String.to_integer(emoji_id), fn {_status, emoji} -> {:open, emoji} end)}
+        Map.update!(board, String.to_integer(emoji_id), fn {_status, emoji} -> {:open, emoji} end)
       else
-        check_open_emojis(board)
+        board
       end
 
-    new_state =
-      if round_outcome == :good_pair do
-        new_players = inc_point(players, socket_id)
-
-        state
-        |> Map.update!(:board, fn _ -> new_board end)
-        |> Map.update!(:players, fn _ -> new_players end)
-      else
-        %{state | board: new_board}
-      end
+    new_state = %{state | board: new_board}
 
     {:reply, new_state, new_state}
   end
@@ -83,26 +77,42 @@ defmodule Memory.Database do
     {:reply, new_state, new_state}
   end
 
-  defp check_open_emojis(board) do
+  def handle_call(
+        {:check_open_emojis, socket_id},
+        _from,
+        %{board: board, players: players} = state
+      ) do
     open_emojis = board |> Enum.filter(fn {_id, {status, _}} -> status == :open end)
 
-    case open_emojis do
-      [{id1, {_, emoji}}, {id2, {_, emoji}}] ->
-        new_board =
-          board
-          |> Map.update!(id1, fn {_status, emoji} -> {:guessed, emoji} end)
-          |> Map.update!(id2, fn {_status, emoji} -> {:guessed, emoji} end)
+    {new_players, new_board} =
+      case open_emojis do
+        [{id1, {_, emoji}}, {id2, {_, emoji}}] ->
+          updated_board =
+            board
+            |> Map.update!(id1, fn {_status, emoji} -> {:guessed, emoji} end)
+            |> Map.update!(id2, fn {_status, emoji} -> {:guessed, emoji} end)
 
-        {:good_pair, new_board}
+          updated_players = inc_point(players, socket_id)
+          {updated_players, updated_board}
 
-      [{id1, {_, _}}, {id2, {_, _}}] ->
-        new_board =
-          board
-          |> Map.update!(id1, fn {_status, emoji} -> {:hidden, emoji} end)
-          |> Map.update!(id2, fn {_status, emoji} -> {:hidden, emoji} end)
+        [{id1, {_, _}}, {id2, {_, _}}] ->
+          updated_board =
+            board
+            |> Map.update!(id1, fn {_status, emoji} -> {:hidden, emoji} end)
+            |> Map.update!(id2, fn {_status, emoji} -> {:hidden, emoji} end)
 
-        {:bad_pair, new_board}
-    end
+          {players, updated_board}
+
+        _ ->
+          {players, board}
+      end
+
+    new_state =
+      state
+      |> Map.update!(:players, fn _ -> new_players end)
+      |> Map.update!(:board, fn _ -> new_board end)
+
+    {:reply, new_state, new_state}
   end
 
   defp generate_game_board do

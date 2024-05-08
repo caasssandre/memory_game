@@ -44,12 +44,26 @@ defmodule MemoryWeb.MemoryLive do
   end
 
   def handle_event("open_emoji", %{"id" => emoji_id}, socket) do
-    Database.open(emoji_id, socket.id)
+    Database.open(emoji_id)
+    Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :board_updated)
+    Process.send_after(self(), :check_open_emojis, 3000)
+
     {:noreply, assign(socket, board: Database.board(), players: Database.players())}
   end
 
   def handle_event("reset_game", _params, socket) do
     Database.reset()
     {:noreply, assign(socket, board: Database.board(), players: Database.players())}
+  end
+
+  def handle_info(:check_open_emojis, socket) do
+    Database.check_open_emojis(socket.id)
+    Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :board_updated)
+
+    {:noreply, socket |> assign(board: Database.board(), players: Database.players())}
+  end
+
+  def handle_info(:board_updated, socket) do
+    {:noreply, socket |> assign(board: Database.board(), players: Database.players())}
   end
 end
