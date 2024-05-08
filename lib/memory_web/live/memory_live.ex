@@ -52,12 +52,16 @@ defmodule MemoryWeb.MemoryLive do
       </div>
 
       <button
-        :if={@player_id == nil}
+        :if={@player_id == nil && length(@players) < 2}
         phx-click="join_game"
         class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded m-4"
       >
         Join game
       </button>
+
+      <p :if={length(@players) == 2 && @player_id == nil}>
+        There are already 2 players in the game. You cannot join.
+      </p>
 
       <button
         phx-click="reset_game"

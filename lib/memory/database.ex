@@ -21,8 +21,8 @@ defmodule Memory.Database do
     GenServer.call(pid, :current_player)
   end
 
-  def check_open_emojis(pid \\ __MODULE__, socket_id) do
-    GenServer.call(pid, {:check_open_emojis, socket_id})
+  def check_open_emojis(pid \\ __MODULE__, player_id) do
+    GenServer.call(pid, {:check_open_emojis, player_id})
   end
 
   def join_game_room(pid \\ __MODULE__) do
@@ -40,7 +40,9 @@ defmodule Memory.Database do
   def handle_call({:open, emoji_id}, _from, %{board: board} = state) do
     new_board =
       if board |> Enum.filter(fn {_id, {status, _}} -> status == :open end) |> length() < 2 do
-        Map.update!(board, String.to_integer(emoji_id), fn {_status, emoji} -> {:open, emoji} end)
+        List.update_at(board, String.to_integer(emoji_id), fn {id, {_status, emoji}} ->
+          {id, {:open, emoji}}
+        end)
       else
         board
       end
@@ -91,7 +93,7 @@ defmodule Memory.Database do
   end
 
   def handle_call(
-        {:check_open_emojis, socket_id},
+        {:check_open_emojis, player_id},
         _from,
         %{board: board, players: players, current_player: current_player} = state
       ) do
@@ -102,17 +104,17 @@ defmodule Memory.Database do
         [{id1, {_, emoji}}, {id2, {_, emoji}}] ->
           updated_board =
             board
-            |> Map.update!(id1, fn {_status, emoji} -> {:guessed, emoji} end)
-            |> Map.update!(id2, fn {_status, emoji} -> {:guessed, emoji} end)
+            |> List.update_at(id1, fn {id, {_status, emoji}} -> {id, {:guessed, emoji}} end)
+            |> List.update_at(id2, fn {id, {_status, emoji}} -> {id, {:guessed, emoji}} end)
 
-          updated_players = inc_point(players, socket_id)
+          updated_players = inc_point(players, player_id)
           {updated_players, updated_board, current_player}
 
         [{id1, {_, _}}, {id2, {_, _}}] ->
           updated_board =
             board
-            |> Map.update!(id1, fn {_status, emoji} -> {:hidden, emoji} end)
-            |> Map.update!(id2, fn {_status, emoji} -> {:hidden, emoji} end)
+            |> List.update_at(id1, fn {id, {_status, emoji}} -> {id, {:hidden, emoji}} end)
+            |> List.update_at(id2, fn {id, {_status, emoji}} -> {id, {:hidden, emoji}} end)
 
           {players, updated_board, (current_player + 1) |> rem(2)}
 
@@ -134,13 +136,13 @@ defmodule Memory.Database do
     emojis = ["😀", "😂", "🤷"]
 
     (emojis ++ emojis)
+    |> Enum.shuffle()
     |> Enum.with_index()
     |> Enum.map(fn {em, i} -> {i, {:hidden, em}} end)
-    |> Map.new()
   end
 
-  defp inc_point(players, socket_id) do
-    Enum.find_index(players, fn %{id: id, score: _} -> id == socket_id end)
+  defp inc_point(players, player_id) do
+    Enum.find_index(players, fn %{id: id, score: _} -> id == player_id end)
     |> case do
       nil ->
         players
