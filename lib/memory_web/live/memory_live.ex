@@ -6,12 +6,9 @@ defmodule MemoryWeb.MemoryLive do
   def mount(_params, _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Memory.PubSub, "memory")
-    else
-      Database.join_game_room(socket.id)
-      Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :board_updated)
     end
 
-    socket = assign(socket, board: Database.board(), players: Database.players())
+    socket = assign(socket, board: Database.board(), players: Database.players(), player_id: nil)
 
     {:ok, socket}
   end
@@ -21,8 +18,9 @@ defmodule MemoryWeb.MemoryLive do
     <div class="bg-gray-100">
       <div class="container mx-auto p-4">
         <h1 class="text-2xl font-bold">Memory</h1>
-        <ul :for={%{id: _, score: score} <- @players} style="list-style: disc;" class="ml-4">
-          <li>Score: <%= score %></li>
+        <p :if={@player_id != nil}>You are player <%= @player_id %></p>
+        <ul :for={%{id: id, score: score} <- @players} style="list-style: disc;" class="ml-4">
+          <li>Score for player <%= id %>: <%= score %></li>
         </ul>
 
         <p class="text-gray-600">A simple memory game</p>
@@ -45,6 +43,14 @@ defmodule MemoryWeb.MemoryLive do
       </div>
 
       <button
+        :if={@player_id == nil}
+        phx-click="join_game"
+        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded m-4"
+      >
+        Join game
+      </button>
+
+      <button
         phx-click="reset_game"
         class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded m-4"
       >
@@ -59,22 +65,61 @@ defmodule MemoryWeb.MemoryLive do
     Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :board_updated)
     Process.send_after(self(), :check_open_emojis, 3000)
 
-    {:noreply, assign(socket, board: Database.board(), players: Database.players())}
+    {:noreply,
+     assign(socket,
+       board: Database.board(),
+       players: Database.players()
+     )}
   end
 
   def handle_event("reset_game", _params, socket) do
     Database.reset()
     Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :board_updated)
-    {:noreply, assign(socket, board: Database.board(), players: Database.players())}
+
+    {:noreply,
+     assign(socket,
+       board: Database.board(),
+       players: Database.players(),
+       player_id: nil
+     )}
+  end
+
+  def handle_event("join_game", _params, socket) do
+    player_id = Database.join_game_room()
+    Phoenix.PubSub.broadcast(Memory.PubSub, "memory", {:player_joined})
+
+    {:noreply,
+     assign(socket,
+       board: Database.board(),
+       players: Database.players(),
+       player_id: player_id
+     )}
   end
 
   def handle_info(:check_open_emojis, socket) do
-    Database.check_open_emojis(socket.id)
+    Database.check_open_emojis(socket.assigns.player_id)
     Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :board_updated)
-    {:noreply, socket |> assign(board: Database.board(), players: Database.players())}
+
+    {:noreply,
+     socket
+     |> assign(
+       board: Database.board(),
+       players: Database.players()
+     )}
   end
 
   def handle_info(:board_updated, socket) do
-    {:noreply, socket |> assign(board: Database.board(), players: Database.players())}
+    {:noreply,
+     socket
+     |> assign(
+       board: Database.board(),
+       players: Database.players()
+     )}
+  end
+
+  def handle_info({:player_joined}, socket) do
+    {:noreply,
+     socket
+     |> assign(players: Database.players())}
   end
 end

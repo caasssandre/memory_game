@@ -21,8 +21,8 @@ defmodule Memory.Database do
     GenServer.call(pid, {:check_open_emojis, socket_id})
   end
 
-  def join_game_room(pid \\ __MODULE__, socket_id) do
-    GenServer.call(pid, {:join_game_room, socket_id})
+  def join_game_room(pid \\ __MODULE__) do
+    GenServer.call(pid, :join_game_room)
   end
 
   def reset(pid \\ __MODULE__) do
@@ -51,31 +51,31 @@ defmodule Memory.Database do
   end
 
   def handle_call(:players, _from, state) do
-    {:reply, state.players, state}
+    {:reply, Enum.reverse(state.players), state}
   end
 
-  def handle_call({:join_game_room, socket_id}, _from, %{players: []} = state) do
-    new_players = %{id: socket_id, score: 0}
+  def handle_call(:join_game_room, _from, %{players: []} = state) do
+    new_players = %{id: 1, score: 0}
     new_state = %{state | players: [new_players]}
 
-    {:reply, new_state, new_state}
+    {:reply, 1, new_state}
   end
 
-  def handle_call({:join_game_room, socket_id}, _from, %{players: [player_one | []]} = state) do
-    new_players = [%{id: socket_id, score: 0}, player_one]
+  def handle_call(:join_game_room, _from, %{players: [player_one | []]} = state) do
+    new_players = [%{id: 2, score: 0}, player_one]
     new_state = %{state | players: new_players}
 
-    {:reply, new_state, new_state}
+    {:reply, 2, new_state}
   end
 
-  def handle_call({:join_game_room, _socket_id}, _from, state) do
-    {:reply, state, state}
+  def handle_call(:join_game_room, _from, state) do
+    {:reply, 0, state}
   end
 
   def handle_call(:reset, _from, state) do
     new_state =
       state
-      |> Map.update!(:players, fn _ -> reset_players(state) end)
+      |> Map.update!(:players, fn _ -> [] end)
       |> Map.update!(:board, fn _ -> generate_game_board() end)
 
     {:reply, new_state, new_state}
@@ -120,17 +120,13 @@ defmodule Memory.Database do
   end
 
   defp generate_game_board do
-    emojis = ["😀", "😂", "😅", "😍", "😎", "😏", "😡", "🥳", "😭", "🤔", "🤩", "🤷"]
-    # emojis = ["😀", "😂", "🤷"]
+    # emojis = ["😀", "😂", "😅", "😍", "😎", "😏", "😡", "🥳", "😭", "🤔", "🤩", "🤷"]
+    emojis = ["😀", "😂", "🤷"]
 
     (emojis ++ emojis)
     |> Enum.with_index()
     |> Enum.map(fn {em, i} -> {i, {:hidden, em}} end)
     |> Map.new()
-  end
-
-  defp reset_players(%{players: players}) do
-    Enum.map(players, fn player -> %{id: player.id, score: 0} end)
   end
 
   defp inc_point(players, socket_id) do
