@@ -24,14 +24,7 @@ defmodule MemoryWeb.MemoryLive do
     <div class="bg-gray-100">
       <div class="container mx-auto p-4">
         <h1 class="text-2xl font-bold">Memory</h1>
-        <p :if={@player_id != nil}>You are player <%= @player_id %></p>
-        <p :if={@current_player + 1 == @player_id} class="text-green-500">It's your turn</p>
-        <p :if={@current_player + 1 != @player_id} class="text-red-500">Waiting for other player</p>
-        <ul :for={%{id: id, score: score} <- @players} style="list-style: disc;" class="ml-4">
-          <li>Score for player <%= id %>: <%= score %></li>
-        </ul>
-
-        <p class="text-gray-600">A simple memory game</p>
+        <.game_state player_id={@player_id} players={@players} , current_player={@current_player} />
 
         <div class="text-2xl ml-4 flex flex-wrap">
           <p :for={{i, {status, emoji}} <- @board} class="m-3">
@@ -50,26 +43,47 @@ defmodule MemoryWeb.MemoryLive do
           </p>
         </div>
       </div>
-
-      <button
-        :if={@player_id == nil && length(@players) < 2}
-        phx-click="join_game"
-        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded m-4"
-      >
-        Join game
-      </button>
-
-      <p :if={length(@players) == 2 && @player_id == nil}>
-        There are already 2 players in the game. You cannot join.
-      </p>
-
-      <button
-        phx-click="reset_game"
-        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded m-4"
-      >
-        Reset game
-      </button>
+      <.actions_box player_id={@player_id} , players={@players} />
     </div>
+    """
+  end
+
+  def game_state(assigns) do
+    ~H"""
+    <p :if={@player_id != nil}>You are player <%= @player_id %></p>
+    <p :if={@current_player + 1 == @player_id} class="text-green-500">It's your turn</p>
+    <p :if={@current_player + 1 != @player_id && length(@players) == 2} class="text-red-500">
+      Waiting for other player to play
+    </p>
+    <p :if={@player_id != nil && length(@players) == 1} class="text-red-500">
+      Waiting for other player to join
+    </p>
+    <ul :for={%{id: id, score: score} <- @players} style="list-style: disc;" class="ml-4">
+      <li>Score for player <%= id %>: <%= score %></li>
+    </ul>
+    """
+  end
+
+  def actions_box(assigns) do
+    ~H"""
+    <button
+      :if={@player_id == nil && length(@players) < 2}
+      phx-click="join_game"
+      class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded m-4"
+    >
+      Join game
+    </button>
+
+    <p :if={length(@players) == 2 && @player_id == nil}>
+      There are already 2 players in the game. You cannot join.
+    </p>
+
+    <button
+      phx-click="reset_game"
+      class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded m-4"
+    >
+      Reset game
+    </button>
     """
   end
 
