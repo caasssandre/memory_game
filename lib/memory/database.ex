@@ -1,68 +1,22 @@
 defmodule Memory.Database do
   use GenServer
 
-  def start_link(_opts) do
-    GenServer.start_link(__MODULE__, nil, name: __MODULE__)
-  end
-
-  def open(pid \\ __MODULE__, emoji_id) do
-    GenServer.call(pid, {:open, emoji_id})
-  end
-
-  def board(pid \\ __MODULE__) do
-    GenServer.call(pid, :board)
-  end
-
-  def players(pid \\ __MODULE__) do
-    GenServer.call(pid, :players)
-  end
-
-  def current_player(pid \\ __MODULE__) do
-    GenServer.call(pid, :current_player)
-  end
-
-  def check_open_emojis(pid \\ __MODULE__) do
-    GenServer.call(pid, :check_open_emojis)
-  end
-
-  def join_game_room(pid \\ __MODULE__) do
-    GenServer.call(pid, :join_game_room)
-  end
-
-  def reset(pid \\ __MODULE__) do
-    GenServer.call(pid, :reset)
-  end
+  def start_link(_opts), do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
+  def open(pid \\ __MODULE__, emoji_id), do: GenServer.call(pid, {:open, emoji_id})
+  def check_open_emojis(pid \\ __MODULE__), do: GenServer.call(pid, :check_open_emojis)
+  def board(pid \\ __MODULE__), do: GenServer.call(pid, :board)
+  def players(pid \\ __MODULE__), do: GenServer.call(pid, :players)
+  def current_player(pid \\ __MODULE__), do: GenServer.call(pid, :current_player)
+  def join_game_room(pid \\ __MODULE__), do: GenServer.call(pid, :join_game_room)
+  def reset(pid \\ __MODULE__), do: GenServer.call(pid, :reset)
 
   def init(_opts) do
     {:ok, %{board: generate_game_board(), players: [], current_player: 0}}
   end
 
-  def handle_call({:open, emoji_id}, _from, %{board: board} = state) do
-    new_board =
-      if board |> Enum.filter(fn {_id, {status, _}} -> status == :open end) |> length() < 2 do
-        List.update_at(board, String.to_integer(emoji_id), fn {id, {_status, emoji}} ->
-          {id, {:open, emoji}}
-        end)
-      else
-        board
-      end
-
-    new_state = %{state | board: new_board}
-
-    {:reply, new_state, new_state}
-  end
-
-  def handle_call(:board, _from, state) do
-    {:reply, state.board, state}
-  end
-
-  def handle_call(:players, _from, state) do
-    {:reply, Enum.reverse(state.players), state}
-  end
-
-  def handle_call(:current_player, _from, state) do
-    {:reply, state.current_player, state}
-  end
+  def handle_call(:board, _from, state), do: {:reply, state.board, state}
+  def handle_call(:players, _from, state), do: {:reply, Enum.reverse(state.players), state}
+  def handle_call(:current_player, _from, state), do: {:reply, state.current_player, state}
 
   def handle_call(:join_game_room, _from, %{players: []} = state) do
     new_players = %{id: 1, score: 0}
@@ -92,6 +46,29 @@ defmodule Memory.Database do
     {:reply, new_state, new_state}
   end
 
+  def handle_call({:open, emoji_id}, _from, %{board: board} = state) do
+    open_emojis = board |> Enum.filter(fn {_id, {status, _}} -> status == :open end)
+
+    new_board =
+      cond do
+        length(open_emojis) == 0 ->
+          List.update_at(board, String.to_integer(emoji_id), fn {id, {_status, emoji}} ->
+            {id, {:open, emoji}}
+          end)
+
+        length(open_emojis) == 1 ->
+          List.update_at(board, String.to_integer(emoji_id), fn {id, {_status, emoji}} ->
+            {id, {:open, emoji}}
+          end)
+
+        true ->
+          board
+      end
+
+    new_state = %{state | board: new_board}
+    {:reply, new_state, new_state}
+  end
+
   def handle_call(
         :check_open_emojis,
         _from,
@@ -99,7 +76,7 @@ defmodule Memory.Database do
       ) do
     open_emojis = board |> Enum.filter(fn {_id, {status, _}} -> status == :open end)
 
-    {new_players, new_board, new_current_player} =
+    {outcome, new_players, new_board, new_current_player} =
       case open_emojis do
         [{id1, {_, emoji}}, {id2, {_, emoji}}] ->
           updated_board =
@@ -108,7 +85,7 @@ defmodule Memory.Database do
             |> List.update_at(id2, fn {id, {_status, emoji}} -> {id, {:guessed, emoji}} end)
 
           updated_players = inc_point(players, current_player + 1)
-          {updated_players, updated_board, current_player}
+          {:good_guess, updated_players, updated_board, current_player}
 
         [{id1, {_, _}}, {id2, {_, _}}] ->
           updated_board =
@@ -116,10 +93,10 @@ defmodule Memory.Database do
             |> List.update_at(id1, fn {id, {_status, emoji}} -> {id, {:hidden, emoji}} end)
             |> List.update_at(id2, fn {id, {_status, emoji}} -> {id, {:hidden, emoji}} end)
 
-          {players, updated_board, (current_player + 1) |> rem(2)}
+          {:no_guess, players, updated_board, (current_player + 1) |> rem(2)}
 
         _ ->
-          {players, board, current_player}
+          {:no_guess, players, board, current_player}
       end
 
     new_state =
@@ -128,7 +105,7 @@ defmodule Memory.Database do
       |> Map.update!(:board, fn _ -> new_board end)
       |> Map.update!(:current_player, fn _ -> new_current_player end)
 
-    {:reply, new_state, new_state}
+    {:reply, {outcome, new_state}, new_state}
   end
 
   defp generate_game_board do
