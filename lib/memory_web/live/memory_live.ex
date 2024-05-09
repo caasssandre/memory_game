@@ -179,6 +179,7 @@ defmodule MemoryWeb.MemoryLive do
     </p>
 
     <button
+      :if={length(@players) > 0}
       phx-click="reset_game"
       class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded m-4"
     >
