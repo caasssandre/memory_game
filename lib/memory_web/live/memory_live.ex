@@ -3,7 +3,7 @@ defmodule MemoryWeb.MemoryLive do
 
   alias Memory.Database
 
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Memory.PubSub, "memory")
     end
@@ -14,7 +14,8 @@ defmodule MemoryWeb.MemoryLive do
         players: Database.players(),
         player_id: nil,
         winner: nil,
-        current_player: Database.current_player()
+        current_player: Database.current_player(),
+        turn_in_progress: false
       )
 
     {:ok, socket}
@@ -28,24 +29,31 @@ defmodule MemoryWeb.MemoryLive do
         <.game_state
           player_id={@player_id}
           players={@players}
-          ,
           current_player={@current_player}
-          ,
           winner={@winner}
+          turn_in_progress={@turn_in_progress}
         />
 
-        <div class="text-2xl ml-4 flex flex-wrap">
+        <div class="grid grid-cols-4 gap-1">
           <p :for={{i, {status, emoji}} <- @board} class="m-3">
             <span
-              :if={status == :hidden && @current_player + 1 == @player_id}
+              :if={status == :hidden && @current_player + 1 == @player_id && !@turn_in_progress}
               phx-click="open_emoji"
               phx-value-id={i}
-              class="cursor-pointer"
+              class="cursor-pointer text-3xl flex justify-center items-center"
             >
               X
             </span>
-            <span :if={status == :hidden && @current_player + 1 != @player_id}>X</span>
-            <span :if={status == :open || status == :guessed} class="cursor-default">
+            <span
+              :if={status == :hidden && (@current_player + 1 != @player_id || @turn_in_progress)}
+              class="text-3xl flex justify-center items-center"
+            >
+              X
+            </span>
+            <span
+              :if={status == :open || status == :guessed}
+              class="cursor-default text-3xl flex justify-center items-center"
+            >
               <%= emoji %>
             </span>
           </p>
@@ -60,8 +68,14 @@ defmodule MemoryWeb.MemoryLive do
     ~H"""
     <p :if={@winner != nil} class="text-green-500">Player <%= @winner %> won!</p>
     <p :if={@player_id != nil}>You are player <%= @player_id %></p>
-    <p :if={@current_player + 1 == @player_id} class="text-green-500">It's your turn</p>
-    <p :if={@current_player + 1 != @player_id && length(@players) == 2} class="text-red-500">
+    <p :if={@turn_in_progress} class="text-blue-500">Memorize the emojis before they disappear!</p>
+    <p :if={@current_player + 1 == @player_id && !@turn_in_progress} class="text-green-500">
+      It's your turn
+    </p>
+    <p
+      :if={@current_player + 1 != @player_id && length(@players) == 2 && !@turn_in_progress}
+      class="text-red-500"
+    >
       Waiting for other player to play
     </p>
     <p :if={@player_id != nil && length(@players) == 1 && @winner == nil} class="text-red-500">
@@ -98,8 +112,16 @@ defmodule MemoryWeb.MemoryLive do
 
   def handle_event("open_emoji", %{"id" => emoji_id}, socket) do
     Database.open(emoji_id)
-    Phoenix.PubSub.broadcast(Memory.PubSub, "memory", {:game_updated, Database.board()})
-    reload_board()
+    latest_board = Database.board()
+
+    if latest_board
+       |> Enum.filter(fn {_id, {status, _}} -> status == :open end)
+       |> length() == 2 do
+      Phoenix.PubSub.broadcast(Memory.PubSub, "memory", {:turn_in_progress, latest_board})
+      reload_board()
+    else
+      Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_updated)
+    end
 
     {:noreply, socket}
   end
@@ -138,7 +160,7 @@ defmodule MemoryWeb.MemoryLive do
         Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_over)
 
       :no_guess ->
-        Process.send_after(self(), :game_updated_delayed, 4000)
+        Process.send_after(self(), :game_updated_delayed, 3000)
     end
   end
 
@@ -153,17 +175,19 @@ defmodule MemoryWeb.MemoryLive do
      |> assign(
        board: Database.board(),
        players: Database.players(),
-       current_player: Database.current_player()
+       current_player: Database.current_player(),
+       turn_in_progress: false
      )}
   end
 
-  def handle_info({:game_updated, board}, socket) do
+  def handle_info({:turn_in_progress, board}, socket) do
     {:noreply,
      socket
      |> assign(
        board: board,
        players: Database.players(),
-       current_player: Database.current_player()
+       current_player: Database.current_player(),
+       turn_in_progress: true
      )}
   end
 
