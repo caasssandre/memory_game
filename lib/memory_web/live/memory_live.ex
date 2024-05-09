@@ -89,14 +89,10 @@ defmodule MemoryWeb.MemoryLive do
 
   def handle_event("open_emoji", %{"id" => emoji_id}, socket) do
     Database.open(emoji_id)
-    Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_updated)
-    Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :reload_board)
+    Phoenix.PubSub.broadcast(Memory.PubSub, "memory", {:game_updated, Database.board()})
+    reload_board()
 
-    {:noreply,
-     assign(socket,
-       board: Database.board(),
-       players: Database.players()
-     )}
+    {:noreply, socket}
   end
 
   def handle_event("reset_game", _params, socket) do
@@ -124,12 +120,20 @@ defmodule MemoryWeb.MemoryLive do
      )}
   end
 
-  def handle_info(:reload_board, socket) do
+  def reload_board() do
     case Database.check_open_emojis() do
-      {:good_guess, _} -> Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_updated)
-      {_, _} -> Process.send_after(self(), :game_updated, 4000)
-    end
+      {:good_guess, _} ->
+        dbg("Good guess")
+        Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_updated)
 
+      {_, _} ->
+        dbg("Bad guess")
+        Process.send_after(self(), :game_updated_delayed, 4000)
+    end
+  end
+
+  def handle_info(:game_updated_delayed, socket) do
+    Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_updated)
     {:noreply, socket}
   end
 
@@ -138,6 +142,16 @@ defmodule MemoryWeb.MemoryLive do
      socket
      |> assign(
        board: Database.board(),
+       players: Database.players(),
+       current_player: Database.current_player()
+     )}
+  end
+
+  def handle_info({:game_updated, board}, socket) do
+    {:noreply,
+     socket
+     |> assign(
+       board: board,
        players: Database.players(),
        current_player: Database.current_player()
      )}
