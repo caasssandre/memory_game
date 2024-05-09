@@ -101,7 +101,7 @@ defmodule MemoryWeb.MemoryLive do
       when current_player == local_player_id and not turn_in_progress do
     ~H"""
     <span
-      phx-click="open_emoji"
+      phx-click="show_emoji"
       phx-value-id={@id}
       class="cursor-pointer text-3xl flex justify-center items-center"
     >
@@ -187,10 +187,10 @@ defmodule MemoryWeb.MemoryLive do
     """
   end
 
-  def handle_event("open_emoji", %{"id" => emoji_id}, socket) do
-    latest_board = Database.open(String.to_integer(emoji_id))
+  def handle_event("show_emoji", %{"id" => emoji_id}, socket) do
+    latest_board = Database.show_emoji(String.to_integer(emoji_id))
 
-    if Enum.count(latest_board, fn {_id, {status, _}} -> status == :open end) == 2 do
+    if Enum.count(latest_board, fn {_id, {status, _}} -> status == :visible end) == 2 do
       Phoenix.PubSub.broadcast(Memory.PubSub, "memory", {:turn_in_progress, latest_board})
       reload_board()
     else

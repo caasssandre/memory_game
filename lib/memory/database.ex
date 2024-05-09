@@ -7,7 +7,7 @@ defmodule Memory.Database do
   def players(pid \\ __MODULE__), do: GenServer.call(pid, :players)
   def current_player(pid \\ __MODULE__), do: GenServer.call(pid, :current_player)
   def join_game_room(pid \\ __MODULE__), do: GenServer.call(pid, :join_game_room)
-  def open(pid \\ __MODULE__, emoji_id), do: GenServer.call(pid, {:open, emoji_id})
+  def show_emoji(pid \\ __MODULE__, emoji_id), do: GenServer.call(pid, {:show_emoji, emoji_id})
   def check_open_emojis(pid \\ __MODULE__), do: GenServer.call(pid, :check_open_emojis)
   def reset(pid \\ __MODULE__), do: GenServer.call(pid, :reset)
 
@@ -35,8 +35,8 @@ defmodule Memory.Database do
     {:reply, :error, state}
   end
 
-  def handle_call({:open, emoji_id}, _from, %{board: board} = state) do
-    board = List.update_at(board, emoji_id, &change_emoji_status(&1, :open))
+  def handle_call({:show_emoji, emoji_id}, _from, %{board: board} = state) do
+    board = List.update_at(board, emoji_id, &change_emoji_status(&1, :visible))
 
     state = %{state | board: board}
     {:reply, board, state}
@@ -44,7 +44,7 @@ defmodule Memory.Database do
 
   def handle_call(:check_open_emojis, _from, %{board: board} = state) do
     {outcome, new_players, new_board, new_current_player} =
-      Enum.filter(board, fn {_id, {status, _}} -> status == :open end)
+      Enum.filter(board, fn {_id, {status, _}} -> status == :visible end)
       |> analyse_emoji_pair(state)
 
     state =
