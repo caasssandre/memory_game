@@ -43,15 +43,15 @@ defmodule Memory.Database do
   end
 
   def handle_call(:check_open_emojis, _from, %{board: board} = state) do
-    {outcome, new_players, new_board, new_current_player} =
+    {outcome, players, board, current_player} =
       Enum.filter(board, fn {_id, {status, _}} -> status == :visible end)
       |> analyse_emoji_pair(state)
 
     state =
       state
-      |> Map.update!(:players, fn _ -> new_players end)
-      |> Map.update!(:board, fn _ -> new_board end)
-      |> Map.update!(:current_player, fn _ -> new_current_player end)
+      |> Map.update!(:players, fn _ -> players end)
+      |> Map.update!(:board, fn _ -> board end)
+      |> Map.update!(:current_player, fn _ -> current_player end)
 
     {:reply, outcome, state}
   end
