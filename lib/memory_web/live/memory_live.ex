@@ -13,6 +13,7 @@ defmodule MemoryWeb.MemoryLive do
         board: Database.board(),
         players: Database.players(),
         player_id: nil,
+        winner: nil,
         current_player: Database.current_player()
       )
 
@@ -24,7 +25,14 @@ defmodule MemoryWeb.MemoryLive do
     <div class="bg-gray-100">
       <div class="container mx-auto p-4">
         <h1 class="text-2xl font-bold">Memory</h1>
-        <.game_state player_id={@player_id} players={@players} , current_player={@current_player} />
+        <.game_state
+          player_id={@player_id}
+          players={@players}
+          ,
+          current_player={@current_player}
+          ,
+          winner={@winner}
+        />
 
         <div class="text-2xl ml-4 flex flex-wrap">
           <p :for={{i, {status, emoji}} <- @board} class="m-3">
@@ -50,6 +58,7 @@ defmodule MemoryWeb.MemoryLive do
 
   def game_state(assigns) do
     ~H"""
+    <p :if={@winner != nil} class="text-green-500">Player <%= @winner %> won!</p>
     <p :if={@player_id != nil}>You are player <%= @player_id %></p>
     <p :if={@current_player + 1 == @player_id} class="text-green-500">It's your turn</p>
     <p :if={@current_player + 1 != @player_id && length(@players) == 2} class="text-red-500">
@@ -122,12 +131,13 @@ defmodule MemoryWeb.MemoryLive do
 
   def reload_board() do
     case Database.check_open_emojis() do
-      {:good_guess, _} ->
-        dbg("Good guess")
+      :good_guess ->
         Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_updated)
 
-      {_, _} ->
-        dbg("Bad guess")
+      :game_over ->
+        Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_over)
+
+      :no_guess ->
         Process.send_after(self(), :game_updated_delayed, 4000)
     end
   end
@@ -171,6 +181,16 @@ defmodule MemoryWeb.MemoryLive do
        players: Database.players(),
        current_player: Database.current_player(),
        player_id: nil
+     )}
+  end
+
+  def handle_info(:game_over, socket) do
+    {:noreply,
+     socket
+     |> assign(
+       board: Database.board(),
+       players: Database.players(),
+       winner: Database.current_player() + 1
      )}
   end
 end

@@ -85,7 +85,12 @@ defmodule Memory.Database do
             |> List.update_at(id2, fn {id, {_status, emoji}} -> {id, {:guessed, emoji}} end)
 
           updated_players = inc_point(players, current_player + 1)
-          {:good_guess, updated_players, updated_board, current_player}
+
+          if(updated_board |> Enum.all?(fn {_id, {status, _}} -> status == :guessed end)) do
+            {:game_over, updated_players, updated_board, current_player}
+          else
+            {:good_guess, updated_players, updated_board, current_player}
+          end
 
         [{id1, {_, _}}, {id2, {_, _}}] ->
           updated_board =
@@ -105,7 +110,7 @@ defmodule Memory.Database do
       |> Map.update!(:board, fn _ -> new_board end)
       |> Map.update!(:current_player, fn _ -> new_current_player end)
 
-    {:reply, {outcome, new_state}, new_state}
+    {:reply, outcome, new_state}
   end
 
   defp generate_game_board do
