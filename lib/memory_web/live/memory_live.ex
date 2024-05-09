@@ -3,7 +3,7 @@ defmodule MemoryWeb.MemoryLive do
 
   alias Memory.Database
 
-  def mount(_params, session, socket) do
+  def mount(_params, _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Memory.PubSub, "memory")
     end
@@ -33,33 +33,44 @@ defmodule MemoryWeb.MemoryLive do
           winner={@winner}
           turn_in_progress={@turn_in_progress}
         />
-
-        <div class="grid grid-cols-4 gap-1">
-          <p :for={{i, {status, emoji}} <- @board} class="m-3">
-            <span
-              :if={status == :hidden && @current_player + 1 == @player_id && !@turn_in_progress}
-              phx-click="open_emoji"
-              phx-value-id={i}
-              class="cursor-pointer text-3xl flex justify-center items-center"
-            >
-              X
-            </span>
-            <span
-              :if={status == :hidden && (@current_player + 1 != @player_id || @turn_in_progress)}
-              class="text-3xl flex justify-center items-center"
-            >
-              X
-            </span>
-            <span
-              :if={status == :open || status == :guessed}
-              class="cursor-default text-3xl flex justify-center items-center"
-            >
-              <%= emoji %>
-            </span>
-          </p>
-        </div>
       </div>
+      <.board
+        :if={length(@players) == 2 && @winner == nil}
+        board={@board}
+        player_id={@player_id}
+        current_player={@current_player}
+        turn_in_progress={@turn_in_progress}
+      />
       <.actions_box player_id={@player_id} , players={@players} />
+    </div>
+    """
+  end
+
+  def board(assigns) do
+    ~H"""
+    <div class="grid grid-cols-4 gap-1">
+      <p :for={{i, {status, emoji}} <- @board} class="m-3">
+        <span
+          :if={status == :hidden && @current_player + 1 == @player_id && !@turn_in_progress}
+          phx-click="open_emoji"
+          phx-value-id={i}
+          class="cursor-pointer text-3xl flex justify-center items-center"
+        >
+          X
+        </span>
+        <span
+          :if={status == :hidden && (@current_player + 1 != @player_id || @turn_in_progress)}
+          class="text-3xl flex justify-center items-center"
+        >
+          X
+        </span>
+        <span
+          :if={status == :open || status == :guessed}
+          class="cursor-default text-3xl flex justify-center items-center"
+        >
+          <%= emoji %>
+        </span>
+      </p>
     </div>
     """
   end
@@ -68,7 +79,9 @@ defmodule MemoryWeb.MemoryLive do
     ~H"""
     <p :if={@winner != nil} class="text-green-500">Player <%= @winner %> won!</p>
     <p :if={@player_id != nil}>You are player <%= @player_id %></p>
-    <p :if={@turn_in_progress} class="text-blue-500">Memorize the emojis before they disappear!</p>
+    <p :if={@turn_in_progress && !@winner} class="text-blue-500">
+      Memorize the emojis before they disappear!
+    </p>
     <p :if={@current_player + 1 == @player_id && !@turn_in_progress} class="text-green-500">
       It's your turn
     </p>
