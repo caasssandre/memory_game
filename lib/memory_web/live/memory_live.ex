@@ -188,12 +188,9 @@ defmodule MemoryWeb.MemoryLive do
   end
 
   def handle_event("open_emoji", %{"id" => emoji_id}, socket) do
-    Database.open(emoji_id)
-    latest_board = Database.board()
+    latest_board = Database.open(String.to_integer(emoji_id))
 
-    if latest_board
-       |> Enum.filter(fn {_id, {status, _}} -> status == :open end)
-       |> length() == 2 do
+    if Enum.count(latest_board, fn {_id, {status, _}} -> status == :open end) == 2 do
       Phoenix.PubSub.broadcast(Memory.PubSub, "memory", {:turn_in_progress, latest_board})
       reload_board()
     else
