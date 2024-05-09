@@ -19,7 +19,10 @@ defmodule MemoryWeb.Router do
 
     get "/", PageController, :home
 
-    live "/memory", MemoryLive, :index
+    live_session :default do
+      live "/memory", MemoryLive, :index
+      live "/memory/:player_id", MemoryLive, :play
+    end
   end
 
   # Other scopes may use custom stacks.

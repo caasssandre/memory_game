@@ -3,16 +3,22 @@ defmodule MemoryWeb.MemoryLive do
 
   alias Memory.Database
 
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Memory.PubSub, "memory")
     end
+
+    p_id =
+      case params["player_id"] do
+        nil -> nil
+        player_id -> String.to_integer(player_id)
+      end
 
     socket =
       assign(socket,
         board: Database.board(),
         players: Database.players(),
-        player_id: nil,
+        player_id: p_id,
         winner: nil,
         current_player: Database.current_player(),
         turn_in_progress: false
@@ -186,6 +192,7 @@ defmodule MemoryWeb.MemoryLive do
        board: Database.board(),
        players: Database.players(),
        player_id: nil,
+       winner: nil,
        current_player: Database.current_player()
      )}
   end
@@ -194,12 +201,19 @@ defmodule MemoryWeb.MemoryLive do
     player_id = Database.join_game_room()
     Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :player_joined)
 
-    {:noreply,
-     assign(socket,
-       board: Database.board(),
-       players: Database.players(),
-       player_id: player_id
-     )}
+    socket =
+      socket
+      |> assign(
+        board: Database.board(),
+        players: Database.players(),
+        player_id: player_id
+      )
+
+    {:noreply, push_patch(socket, to: "/memory/#{player_id}")}
+  end
+
+  def handle_params(_params, _uri, socket) do
+    {:noreply, socket}
   end
 
   def handle_info(:game_updated_delayed, socket) do
@@ -242,7 +256,8 @@ defmodule MemoryWeb.MemoryLive do
        board: Database.board(),
        players: Database.players(),
        current_player: Database.current_player(),
-       player_id: nil
+       player_id: nil,
+       winner: nil
      )}
   end
 
