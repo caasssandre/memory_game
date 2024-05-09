@@ -33,6 +33,7 @@ defmodule MemoryWeb.MemoryLive do
       <div class="container mx-auto p-4">
         <h1 class="text-2xl font-bold">Memory</h1>
         <.game_state
+          :if={@player_id != nil}
           player_id={@player_id}
           players={@players}
           current_player={@current_player}
@@ -41,7 +42,7 @@ defmodule MemoryWeb.MemoryLive do
         />
       </div>
       <.board
-        :if={length(@players) == 2 && @winner == nil}
+        :if={length(@players) == 2 && @winner == nil && @player_id != nil}
         board={@board}
         player_id={@player_id}
         current_player={@current_player}
@@ -104,7 +105,7 @@ defmodule MemoryWeb.MemoryLive do
 
   def game_state(assigns) do
     ~H"""
-    <p :if={@player_id}>You are player <%= @player_id + 1 %></p>
+    <p>You are player <%= @player_id + 1 %></p>
 
     <.message
       :if={length(@players) == 2}
@@ -187,14 +188,7 @@ defmodule MemoryWeb.MemoryLive do
     Database.reset()
     Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_reset)
 
-    {:noreply,
-     assign(socket,
-       board: Database.board(),
-       players: Database.players(),
-       player_id: nil,
-       winner: nil,
-       current_player: Database.current_player()
-     )}
+    {:noreply, socket}
   end
 
   def handle_event("join_game", _params, socket) do
@@ -250,15 +244,17 @@ defmodule MemoryWeb.MemoryLive do
   end
 
   def handle_info(:game_reset, socket) do
-    {:noreply,
-     socket
-     |> assign(
-       board: Database.board(),
-       players: Database.players(),
-       current_player: Database.current_player(),
-       player_id: nil,
-       winner: nil
-     )}
+    socket =
+      socket
+      |> assign(
+        board: Database.board(),
+        players: Database.players(),
+        current_player: Database.current_player(),
+        player_id: nil,
+        winner: nil
+      )
+
+    {:noreply, push_patch(socket, to: "/memory")}
   end
 
   def handle_info(:game_over, socket) do
