@@ -22,18 +22,18 @@ defmodule Memory.Database do
     new_players = %{id: 1, score: 0}
     new_state = %{state | players: [new_players]}
 
-    {:reply, 1, new_state}
+    {:reply, 0, new_state}
   end
 
   def handle_call(:join_game_room, _from, %{players: [player_one | []]} = state) do
     new_players = [%{id: 2, score: 0}, player_one]
     new_state = %{state | players: new_players}
 
-    {:reply, 2, new_state}
+    {:reply, 1, new_state}
   end
 
   def handle_call(:join_game_room, _from, state) do
-    {:reply, 0, state}
+    {:reply, :error, state}
   end
 
   def handle_call(:reset, _from, state) do

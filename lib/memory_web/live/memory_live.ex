@@ -50,53 +50,91 @@ defmodule MemoryWeb.MemoryLive do
     ~H"""
     <div class="grid grid-cols-4 gap-1">
       <p :for={{i, {status, emoji}} <- @board} class="m-3">
-        <span
-          :if={status == :hidden && @current_player + 1 == @player_id && !@turn_in_progress}
-          phx-click="open_emoji"
-          phx-value-id={i}
-          class="cursor-pointer text-3xl flex justify-center items-center"
-        >
-          X
-        </span>
-        <span
-          :if={status == :hidden && (@current_player + 1 != @player_id || @turn_in_progress)}
-          class="text-3xl flex justify-center items-center"
-        >
-          X
-        </span>
-        <span
-          :if={status == :open || status == :guessed}
-          class="cursor-default text-3xl flex justify-center items-center"
-        >
-          <%= emoji %>
-        </span>
+        <.cell
+          id={i}
+          status={status}
+          emoji={emoji}
+          current_player={@current_player}
+          local_player_id={@player_id}
+          turn_in_progress={@turn_in_progress}
+        />
       </p>
     </div>
     """
   end
 
+  def cell(
+        %{
+          status: :hidden,
+          current_player: current_player,
+          local_player_id: local_player_id,
+          turn_in_progress: turn_in_progress
+        } =
+          assigns
+      )
+      when current_player == local_player_id and not turn_in_progress do
+    ~H"""
+    <span
+      phx-click="open_emoji"
+      phx-value-id={@id}
+      class="cursor-pointer text-3xl flex justify-center items-center"
+    >
+      X
+    </span>
+    """
+  end
+
+  def cell(%{status: :hidden} = assigns) do
+    ~H"""
+    <span class="text-3xl flex justify-center items-center">X</span>
+    """
+  end
+
+  def cell(assigns) do
+    ~H"""
+    <span class="text-3xl flex justify-center items-center"><%= @emoji %></span>
+    """
+  end
+
   def game_state(assigns) do
     ~H"""
-    <p :if={@winner != nil} class="text-green-500">Player <%= @winner %> won!</p>
-    <p :if={@player_id != nil}>You are player <%= @player_id %></p>
-    <p :if={@turn_in_progress && !@winner} class="text-blue-500">
-      Memorize the emojis before they disappear!
-    </p>
-    <p :if={@current_player + 1 == @player_id && !@turn_in_progress} class="text-green-500">
-      It's your turn
-    </p>
-    <p
-      :if={@current_player + 1 != @player_id && length(@players) == 2 && !@turn_in_progress}
-      class="text-red-500"
-    >
-      Waiting for other player to play
-    </p>
-    <p :if={@player_id != nil && length(@players) == 1 && @winner == nil} class="text-red-500">
-      Waiting for other player to join
-    </p>
+    <p :if={@player_id}>You are player <%= @player_id + 1 %></p>
+
+    <.message
+      :if={length(@players) == 2}
+      winner={@winner}
+      turn_in_progress={@turn_in_progress}
+      current_player={@current_player}
+      local_player_id={@player_id}
+    />
     <ul :for={%{id: id, score: score} <- @players} style="list-style: disc;" class="ml-4">
       <li>Score for player <%= id %>: <%= score %></li>
     </ul>
+    """
+  end
+
+  def message(%{winner: winner} = assigns) when not is_nil(winner) do
+    ~H"""
+    <p class="text-green-500">The game is over. Player <%= winner %> won!</p>
+    """
+  end
+
+  def message(%{turn_in_progress: true} = assigns) do
+    ~H"""
+    <p class="text-blue-500">Memorize the emojis before they disappear!</p>
+    """
+  end
+
+  def message(%{current_player: current_player, local_player_id: local_player_id} = assigns)
+      when current_player == local_player_id do
+    ~H"""
+    <p class="text-green-500">It's your turn</p>
+    """
+  end
+
+  def message(assigns) do
+    ~H"""
+    <p class="text-red-500">Waiting for other player to play</p>
     """
   end
 
@@ -164,19 +202,6 @@ defmodule MemoryWeb.MemoryLive do
      )}
   end
 
-  def reload_board() do
-    case Database.check_open_emojis() do
-      :good_guess ->
-        Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_updated)
-
-      :game_over ->
-        Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_over)
-
-      :no_guess ->
-        Process.send_after(self(), :game_updated_delayed, 3000)
-    end
-  end
-
   def handle_info(:game_updated_delayed, socket) do
     Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_updated)
     {:noreply, socket}
@@ -229,5 +254,18 @@ defmodule MemoryWeb.MemoryLive do
        players: Database.players(),
        winner: Database.current_player() + 1
      )}
+  end
+
+  defp reload_board() do
+    case Database.check_open_emojis() do
+      :good_guess ->
+        Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_updated)
+
+      :game_over ->
+        Phoenix.PubSub.broadcast(Memory.PubSub, "memory", :game_over)
+
+      :no_guess ->
+        Process.send_after(self(), :game_updated_delayed, 3000)
+    end
   end
 end
