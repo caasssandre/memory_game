@@ -3,22 +3,41 @@ defmodule MemoryWeb.MemoryLive do
 
   alias Memory.Database
 
-  def mount(params, _session, socket) do
+  def mount(%{"player_id" => player_id}, _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Memory.PubSub, "memory")
     end
 
-    p_id =
-      case params["player_id"] do
-        nil -> nil
-        player_id -> String.to_integer(player_id)
-      end
+    players = Database.players()
+
+    socket =
+      assign(socket,
+        board: Database.board(),
+        players: players,
+        player_id: String.to_integer(player_id),
+        winner: nil,
+        current_player: Database.current_player(),
+        turn_in_progress: false
+      )
+
+    if Enum.any?(players, fn p -> p.id == player_id end) do
+      {:ok, socket}
+    else
+      Process.send(self(), :game_reset, [:noconnect])
+      {:ok, socket}
+    end
+  end
+
+  def mount(_params, _session, socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Memory.PubSub, "memory")
+    end
 
     socket =
       assign(socket,
         board: Database.board(),
         players: Database.players(),
-        player_id: p_id,
+        player_id: nil,
         winner: nil,
         current_player: Database.current_player(),
         turn_in_progress: false
@@ -120,9 +139,9 @@ defmodule MemoryWeb.MemoryLive do
     """
   end
 
-  def message(%{winner: winner} = assigns) when not is_nil(winner) do
+  def message(assigns) when not is_nil(assigns.winner) do
     ~H"""
-    <p class="text-green-500">The game is over. Player <%= winner %> won!</p>
+    <p class="text-green-500">The game is over. Player <%= @winner %> won!</p>
     """
   end
 
