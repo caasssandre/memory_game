@@ -64,7 +64,7 @@ defmodule MemoryWeb.MemoryLive do
     <p :if={@current_player + 1 != @player_id && length(@players) == 2} class="text-red-500">
       Waiting for other player to play
     </p>
-    <p :if={@player_id != nil && length(@players) == 1} class="text-red-500">
+    <p :if={@player_id != nil && length(@players) == 1 && @winner == nil} class="text-red-500">
       Waiting for other player to join
     </p>
     <ul :for={%{id: id, score: score} <- @players} style="list-style: disc;" class="ml-4">
