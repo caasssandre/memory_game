@@ -2,6 +2,7 @@ defmodule MemoryWeb.ErrorHTMLTest do
   use MemoryWeb.ConnCase, async: true
 
   # Bring render_to_string/4 for testing custom views
+  # Testing testing
   import Phoenix.Template
 
   test "renders 404.html" do
